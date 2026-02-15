@@ -1,0 +1,21 @@
+{
+  "name": "Play Tune",
+  "publisher": "MicroPythonOS",
+  "short_description": "Speaker test with tones",
+  "long_description": "Plays musical notes and melodies via PWM to verify speaker output. Uses GPIO 47 (I2S DOUT) for the Waveshare ESP32-S3-Touch-LCD-2.8.",
+  "fullname": "com.micropythonos.playtune",
+  "version": "0.1.0",
+  "category": "tools",
+  "activities": [
+    {
+      "entrypoint": "assets/play_tune.py",
+      "classname": "PlayTune",
+      "intent_filters": [
+        {
+          "action": "main",
+          "category": "launcher"
+        }
+      ]
+    }
+  ]
+}

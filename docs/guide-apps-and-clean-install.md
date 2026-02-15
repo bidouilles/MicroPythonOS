@@ -45,6 +45,7 @@ Apps live in `internal_filesystem/apps/`:
 | `com.micropythonos.imageview` | Image viewer |
 | `com.micropythonos.imu` | IMU sensor display |
 | `com.micropythonos.musicplayer` | Music player |
+| `com.micropythonos.playtune` | Speaker test with tones |
 | `com.micropythonos.showbattery` | Battery status |
 | `com.micropythonos.showfonts` | Font browser |
 | `com.micropythonos.soundrecorder` | Sound recorder |
@@ -153,6 +154,27 @@ mpremote cp internal_filesystem/apps/com.yourname.myapp/assets/main.py \
 mpremote reset
 ```
 
+## Board-specific installation
+
+Not all boards have the same peripherals. Use `--board` to install only the apps
+that work on your hardware:
+
+```bash
+./scripts/install.sh --board waveshare_esp32_s3_touch_lcd_28
+```
+
+This installs all system files (`lib/`, `builtin/`, `data/`) but only the user
+apps that are compatible with the board. Apps that require missing hardware
+(camera, microphone, SD card, etc.) are excluded.
+
+Supported boards:
+
+| Board | Flag value |
+|-------|-----------|
+| Waveshare ESP32-S3-Touch-LCD-2.8 | `waveshare_esp32_s3_touch_lcd_28` |
+
+Without `--board`, all apps are installed (original behavior).
+
 ## Clean fresh install (wipe everything)
 
 After flashing new firmware with `./scripts/flash_over_usb.sh`, old apps and
@@ -245,6 +267,7 @@ Then exit REPL (`Ctrl-X`) and reinstall:
 | Task | Command |
 |------|---------|
 | Install everything | `./scripts/install.sh` |
+| Install for specific board | `./scripts/install.sh --board waveshare_esp32_s3_touch_lcd_28` |
 | Install one app | `./scripts/install.sh com.micropythonos.helloworld` |
 | Erase flash + reflash | `esptool.py ... erase_flash` then `flash_over_usb.sh` then `install.sh` |
 | Erase + flash (one step) | `./scripts/flash_over_usb.sh --erase-all` then `install.sh` |

@@ -3,13 +3,53 @@ mydir=$(dirname "$mydir")
 
 pkill -f "python.*mpremote"
 
-appname="$1"
+# Parse arguments
+appname=""
+board=""
+while [ $# -gt 0 ]; do
+	case "$1" in
+		--board)
+			board="$2"
+			shift 2
+			;;
+		*)
+			appname="$1"
+			shift
+			;;
+	esac
+done
+
+# Board-specific app lists. Only user apps (from apps/) are filtered;
+# lib/, builtin/, and data/ are always installed in full.
+get_board_apps() {
+	case "$1" in
+		waveshare_esp32_s3_touch_lcd_28)
+			echo "com.micropythonos.helloworld"
+			echo "com.micropythonos.confetti"
+			echo "com.micropythonos.connect4"
+			echo "com.micropythonos.draw"
+			echo "com.micropythonos.imu"
+			echo "com.micropythonos.musicplayer"
+			echo "com.micropythonos.playtune"
+			echo "com.micropythonos.showbattery"
+			echo "com.micropythonos.showfonts"
+			echo "com.quasikili.quasibird"
+			echo "com.quasikili.quasicalculator"
+			echo "com.quasikili.quasinametag"
+			;;
+		*)
+			echo "Unknown board: $1" >&2
+			exit 1
+			;;
+	esac
+}
 
 echo "This script will install the important files from internal_filesystem/ on the device using mpremote.py"
 echo
-echo "Usage: $0 [appname]"
+echo "Usage: $0 [appname] [--board <board_name>]"
 echo "Example: $0"
 echo "Example: $0 com.micropythonos.about"
+echo "Example: $0 --board waveshare_esp32_s3_touch_lcd_28"
 
 mpremote=$(readlink -f "$mydir/../lvgl_micropython/lib/micropython/tools/mpremote/mpremote.py")
 
@@ -68,17 +108,36 @@ $mpremote fs mkdir :/data/com.micropythonos.system.wifiservice
 $mpremote fs cp ../internal_filesystem_excluded/data/com.micropythonos.system.wifiservice/config.json :/data/com.micropythonos.system.wifiservice/
 
 $mpremote fs mkdir :/apps
-$mpremote fs cp -r apps/com.micropythonos.* :/apps/
-find apps/ -maxdepth 1 -type l | while read symlink; do
-        if echo $symlink | grep quasiboats; then
-		echo "Skipping $symlink because it's needlessly big..."
-		continue
-	fi
-	echo "Handling symlink $symlink"
-	$mpremote fs mkdir :/"$symlink"
-	$mpremote fs cp -r "$symlink"/* :/"$symlink"/
 
-done
+if [ ! -z "$board" ]; then
+	echo "Installing apps for board: $board"
+	for app in $(get_board_apps "$board"); do
+		appdir="apps/$app"
+		if [ ! -d "$appdir" ] && [ ! -L "$appdir" ]; then
+			echo "Warning: $appdir not found, skipping..."
+			continue
+		fi
+		echo "Installing $app"
+		if test -L "$appdir"; then
+			$mpremote fs mkdir :/"$appdir"
+			$mpremote fs cp -r "$appdir"/* :/"$appdir"/
+		else
+			$mpremote fs cp -r "$appdir" :/apps/
+		fi
+	done
+else
+	$mpremote fs cp -r apps/com.micropythonos.* :/apps/
+	find apps/ -maxdepth 1 -type l | while read symlink; do
+		if echo $symlink | grep quasiboats; then
+			echo "Skipping $symlink because it's needlessly big..."
+			continue
+		fi
+		echo "Handling symlink $symlink"
+		$mpremote fs mkdir :/"$symlink"
+		$mpremote fs cp -r "$symlink"/* :/"$symlink"/
+
+	done
+fi
 
 popd
 
