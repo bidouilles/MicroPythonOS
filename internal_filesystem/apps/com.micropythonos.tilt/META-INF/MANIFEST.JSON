@@ -1,0 +1,21 @@
+{
+  "name": "Tilt",
+  "publisher": "MicroPythonOS",
+  "short_description": "Angular deflection display",
+  "long_description": "Shows board pitch and roll angles computed from the QMI8658 accelerometer. Features a visual bubble level indicator and numeric readout.",
+  "fullname": "com.micropythonos.tilt",
+  "version": "0.1.0",
+  "category": "tools",
+  "activities": [
+    {
+      "entrypoint": "assets/tilt.py",
+      "classname": "Tilt",
+      "intent_filters": [
+        {
+          "action": "main",
+          "category": "launcher"
+        }
+      ]
+    }
+  ]
+}

@@ -33,6 +33,7 @@ get_board_apps() {
 			echo "com.micropythonos.playtune"
 			echo "com.micropythonos.showbattery"
 			echo "com.micropythonos.showfonts"
+			echo "com.micropythonos.tilt"
 			echo "com.quasikili.quasibird"
 			echo "com.quasikili.quasicalculator"
 			echo "com.quasikili.quasinametag"

@@ -48,6 +48,7 @@ Apps live in `internal_filesystem/apps/`:
 | `com.micropythonos.playtune` | Speaker test with tones |
 | `com.micropythonos.showbattery` | Battery status |
 | `com.micropythonos.showfonts` | Font browser |
+| `com.micropythonos.tilt` | Angular deflection display |
 | `com.micropythonos.soundrecorder` | Sound recorder |
 | `com.quasikili.quasibird` | Flappy bird clone |
 | `com.quasikili.quasicalculator` | Calculator |
