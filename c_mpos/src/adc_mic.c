@@ -12,24 +12,54 @@
 
 #define ADC_MIC_DEBUG_PRINT(...) mp_printf(&mp_plat_print, __VA_ARGS__)
 
-static mp_obj_t adc_mic_read(void) {
+static mp_obj_t adc_mic_read(size_t n_args, const mp_obj_t *args) {
+    // Extract arguments
+    // args[0]: chunk_samples
+    // args[1]: unit_id
+    // args[2]: adc_channel_list
+    // args[3]: adc_channel_num
+    // args[4]: sample_rate_hz
+    // args[5]: atten
+
+    size_t chunk_samples = mp_obj_get_int(args[0]);
+    int unit_id = mp_obj_get_int(args[1]);
+    
+    mp_obj_t channel_list_obj = args[2];
+    size_t channel_list_len;
+    mp_obj_t *channel_list_items;
+    mp_obj_get_array(channel_list_obj, &channel_list_len, &channel_list_items);
+    
+    int adc_channel_num = mp_obj_get_int(args[3]);
+    int sample_rate_hz = mp_obj_get_int(args[4]);
+    int atten = mp_obj_get_int(args[5]);
+
     ADC_MIC_DEBUG_PRINT("Starting adc_mic_read...\n");
     ADC_MIC_DEBUG_PRINT("CONFIG_ADC_MIC_TASK_CORE: %d\n", CONFIG_ADC_MIC_TASK_CORE);
 
-    // Configuration (your current manual setup with 2.5 dB atten)
+    if (adc_channel_num > 10) {
+        mp_raise_ValueError("Too many channels (max 10)");
+    }
+    if (channel_list_len < adc_channel_num) {
+        mp_raise_ValueError("adc_channel_list shorter than adc_channel_num");
+    }
+
+    uint8_t channels[10];
+    for (size_t i = 0; i < adc_channel_num; i++) {
+        channels[i] = (uint8_t)mp_obj_get_int(channel_list_items[i]);
+    }
+
+    // Configuration
     audio_codec_adc_cfg_t cfg = {
         .handle = NULL,
         .max_store_buf_size = 1024 * 2,
         .conv_frame_size = 1024,
-        .unit_id = ADC_UNIT_1,
-        .adc_channel_list = ((uint8_t[]){ADC_CHANNEL_0}),
-        .adc_channel_num = 1,
-        .sample_rate_hz = 16000,
-        //.atten = ADC_ATTEN_DB_2_5,
-        .atten = ADC_ATTEN_DB_11,
+        .unit_id = (adc_unit_t)unit_id,
+        .adc_channel_list = channels,
+        .adc_channel_num = adc_channel_num, // can probably just count adc_channel_list
+        .sample_rate_hz = sample_rate_hz,
+        .atten = (adc_atten_t)atten,
     };
-    ADC_MIC_DEBUG_PRINT("Config created for channel %d, sample rate %d, atten %d\n",
-                        ADC_CHANNEL_0, 16000, cfg.atten);
+    ADC_MIC_DEBUG_PRINT("Config created for unit %d, channels %d, sample rate %d, atten %d\n", unit_id, adc_channel_num, sample_rate_hz, atten);
 
     // ────────────────────────────────────────────────
     // Initialization (same as before)
@@ -51,8 +81,8 @@ static mp_obj_t adc_mic_read(void) {
     }
 
     esp_codec_dev_sample_info_t fs = {
-        .sample_rate = 16000,
-        .channel = 1,
+        .sample_rate = sample_rate_hz,
+        .channel = adc_channel_num,
         .bits_per_sample = 16,
     };
     esp_err_t open_ret = esp_codec_dev_open(dev, &fs);
@@ -65,10 +95,9 @@ static mp_obj_t adc_mic_read(void) {
     // ────────────────────────────────────────────────
     // Small reusable buffer + tracking variables
     // ────────────────────────────────────────────────
-    const size_t chunk_samples = 512;
-    const size_t buf_size = chunk_samples * sizeof(int16_t);
-    //int16_t *audio_buffer = heap_caps_malloc(buf_size, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
-    int16_t *audio_buffer = heap_caps_malloc_prefer(buf_size, MALLOC_CAP_DEFAULT | MALLOC_CAP_SPIRAM, MALLOC_CAP_DEFAULT);
+    const size_t buf_size = chunk_samples * sizeof(int16_t) * adc_channel_num;
+    int16_t *audio_buffer = heap_caps_malloc(buf_size, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+    //int16_t *audio_buffer = heap_caps_malloc_prefer(buf_size, MALLOC_CAP_DEFAULT | MALLOC_CAP_SPIRAM, MALLOC_CAP_DEFAULT);
     if (audio_buffer == NULL) {
         esp_codec_dev_close(dev);
         esp_codec_dev_delete(dev);
@@ -77,7 +106,8 @@ static mp_obj_t adc_mic_read(void) {
     }
 
     // How many chunks to read (adjust as needed)
-    const int N = 1;  // e.g. 50 × 512 = ~1.5 seconds @ 16 kHz
+    const int N = 1;  // e.g. 5 × 10240 = ~3.2 seconds @ 16 kHz
+    const int chunks_to_print = 0;
 
     int16_t global_min = 32767;
     int16_t global_max = -32768;
@@ -95,10 +125,6 @@ static mp_obj_t adc_mic_read(void) {
             break;
         }
         vTaskDelay(pdMS_TO_TICKS(1));  // 1 ms yield
-        //if (ret != (int)buf_size) {
-        //    ADC_MIC_DEBUG_PRINT("Partial read at chunk %d: got %d bytes (expected %zu)\n",
-        //                        chunk, ret, buf_size);
-        //}
 
         // Update global min/max
         for (size_t i = 0; i < chunk_samples; i++) {
@@ -108,10 +134,11 @@ static mp_obj_t adc_mic_read(void) {
         }
 
         // Optional: print first few chunks for debug (comment out after testing)
-        if (chunk < 3) {
+        if (chunk < chunks_to_print) {
             ADC_MIC_DEBUG_PRINT("Chunk %d first 16 samples:\n", chunk);
             for (size_t i = 0; i < 16; i++) {
-                ADC_MIC_DEBUG_PRINT("%6d ", audio_buffer[i]);
+                int16_t sample = audio_buffer[i];
+                ADC_MIC_DEBUG_PRINT("%6d (0x%04X)", sample, (uint16_t)sample);
                 if ((i + 1) % 8 == 0) ADC_MIC_DEBUG_PRINT("\n");
             }
             ADC_MIC_DEBUG_PRINT("\n");
@@ -141,7 +168,7 @@ static mp_obj_t adc_mic_read(void) {
 
     return last_buf_obj ? last_buf_obj : mp_obj_new_bytes(NULL, 0);
 }
-MP_DEFINE_CONST_FUN_OBJ_0(adc_mic_read_obj, adc_mic_read);
+MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(adc_mic_read_obj, 6, 6, adc_mic_read);
 
 static const mp_rom_map_elem_t adc_mic_module_globals_table[] = {
     { MP_ROM_QSTR(MP_QSTR___name__), MP_ROM_QSTR(MP_QSTR_adc_mic) },
